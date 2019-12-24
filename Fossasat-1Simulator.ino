@@ -50,7 +50,8 @@ volatile bool enableInterrupt = true;
 // ICACHE_RAM_ATTR is required for Wemos D1
 // https://community.blynk.cc/t/error-isr-not-in-iram/37426/20
 
-ICACHE_RAM_ATTR
+// ICACHE_RAM_ATTR is ONLY needed for Wemos D1 and must be remnoved for all others.
+//ICACHE_RAM_ATTR
 void setFlag(void) {
   // check if the interrupt is enabled
   if(!enableInterrupt) {
@@ -83,6 +84,13 @@ void setup() {
   // initialize SX1278 with default settings
   Serial.println();
   Serial.println(F("Fossasat-1 Simulator"));
+
+#ifdef DEBUG
+  Serial.print("MISO="); Serial.println(MISO);
+  Serial.print("MOSI="); Serial.println(MOSI);
+  Serial.print("SCL ="); Serial.println(SCL);
+  Serial.print("NSS ="); Serial.println(SS);
+#endif
   
   Serial.print(F("[SX1278] Initializing ... "));
 
