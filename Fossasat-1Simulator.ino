@@ -1,18 +1,27 @@
 /*
-   Simple simulator for Fossasat-1 groundstations.
+    Simple simulator for Fossasat-1 groundstations.
 
-   This example transmits packets using SX1278 LoRa radio module.
+    This example transmits packets using SX1278 LoRa radio module.
 
-   Reply is provided for 4 commands.
+    Reply is provided for 4 commands.
    
-   0x00 send ping frame
-   0x01 request satellite info
-   0x03 send message to be retransmitted
-   0x04 request last packet info
+    0x00 send ping frame
+    0x01 request satellite info ( hard coded )
+    0x03 send message to be retransmitted
+    0x04 request last packet info
 
-   0x02 is not implemented
+    0x02 is not implemented
+
+    Developer:
+       Asbjorn Riedel
+
+    2020 Jan 04: Updated comments, added license.
+
+    LICENSE     GNU General Public License v3.0
 */
 #define DEBUG
+
+#define VERSION 1
 
 #include <SPI.h>
 
@@ -22,14 +31,12 @@
 // Change to your setup here
 
 // My SX1278 has the following connections:
-// NSS pin:   16
+// NSS pin:   10
 // DIO0 pin:  15
 // DIO1 pin:  15
-SX1278 lora = new Module(16, 15, 15);  // hallard values, frequency is set to 868.7 (as I have no spare 436.7 sx)
-//SX1278 lora = new Module(10, 2, 3);  // arduino values
-#define LORA_CARRIER_FREQUENCY                          868.7f //  For FOSSASAT use 436.7f  // MHz
+SX1278 lora = new Module(10, 2, 3);  // LoraHat + arduino
 
-//#define LORA_CARRIER_FREQUENCY                          436.7f  // MHz
+#define LORA_CARRIER_FREQUENCY                          436.7f  // MHz
 #define LORA_BANDWIDTH                                  125.0f  // kHz dual sideband
 #define LORA_SPREADING_FACTOR                           11
 #define LORA_SPREADING_FACTOR_ALT                       10
@@ -47,20 +54,20 @@ volatile bool enableInterrupt = true;
 // is received by the module
 // IMPORTANT: this function MUST be 'void' type
 //            and MUST NOT have any arguments!
-// ICACHE_RAM_ATTR is required for Wemos D1
+//
+// Note if you use an Wemos D1 as MCU, ICACHE_RAM_ATTR is required
 // https://community.blynk.cc/t/error-isr-not-in-iram/37426/20
-
-// ICACHE_RAM_ATTR is ONLY needed for Wemos D1 and must be remnoved for all others.
 //ICACHE_RAM_ATTR
+
 void setFlag(void) {
   // check if the interrupt is enabled
   if(!enableInterrupt) {
-    Serial.println("interrupt ignored");
+//    Serial.println("interrupt ignored");
     return;
   }
 
   // we got a packet, set the flag
-  Serial.println("got a package");
+//  Serial.println("got a package");
   receivedFlag = true;
 }
 
@@ -86,13 +93,18 @@ void setup() {
   Serial.println(F("Fossasat-1 Simulator"));
 
 #ifdef DEBUG
-  Serial.print("MISO="); Serial.println(MISO);
-  Serial.print("MOSI="); Serial.println(MOSI);
-  Serial.print("SCL ="); Serial.println(SCL);
-  Serial.print("NSS ="); Serial.println(SS);
+// This show the STANDARD pin setup.
+// If you use an ESP you may have to check the values in
+// ref: Library/Arduino15/packages/esp32/hardware/esp32/1.0.4/variants/<Your ESP>/pins_arduino.h
+// as they could be diffent.
+  Serial.print(F("Debug enabled"));
+  Serial.print(F("MISO=")); Serial.println(MISO);
+  Serial.print(F("MOSI=")); Serial.println(MOSI);
+  Serial.print(F("SCL =")); Serial.println(SCL);
+  Serial.print(F("NSS =")); Serial.println(SS);
 #endif
   
-  Serial.print(F("[SX1278] Initializing ... "));
+  Serial.print(F("Initializing ... "));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // The SYNC_WORD discussion.
@@ -105,9 +117,10 @@ void setup() {
 // The way it matches is that the top 8 bits of sx1268 first integer in the SYNC_WORD 0x14 provides  sx1278 SYNC_WORD with the top 8 bit (1)
 // and the top 8 bit of sx1268 second integer in the SYNC_WORD 0x24 provides sx1278 SYNC_WORD with bottom 8 bits (2)
 // SYNC_WORD is 012
-// Same methodfor PUBLIC_SYNCWORD
+// Same methodi for PUBLIC_SYNCWORD
+// This does not work for SYNC_WORD 0xFFFF, which is one issue with Fossasat-1
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  char  SYNC_WORD = 0xff;  //use 0f0f for SX1262  
+  char  SYNC_WORD = 0x12; // make sure you have the matching SyncWord in your Groundstation
 
 // current limit:   100 mA
 // preamble length: 8 symbols
@@ -152,7 +165,7 @@ void setup() {
   lora.setDio0Action(setFlag);
   
   // start listening for LoRa packets
-  Serial.print(F("[SX1278] Starting to listen ... "));
+  Serial.print(F("Starting to listen ... "));
   state = lora.startReceive();
   if (state == ERR_NONE) {
     Serial.println(F("success!"));
@@ -200,7 +213,7 @@ void loop() {
 
 #ifdef DEBUG
     // Create the downlink package
-    Serial.print(F("[SX1278] Transmitting packet ... Type = 0x"));
+    Serial.print(F("Transmitting packet ... Type = 0x"));
     Serial.println((uplinked[10]+10),HEX);
 #endif
     // Set satellite call sign
@@ -293,30 +306,30 @@ void loop() {
       //Serial.println(F(" success!"));
   
       // print measured data rate
-      Serial.print(F("[SX1278] Datarate:\t"));
+      Serial.print(F("Datarate:\t"));
       Serial.print(lora.getDataRate());
       Serial.println(F(" bps"));
   
     } else if (state == ERR_PACKET_TOO_LONG) {
       // the supplied packet was longer than 256 bytes
-      Serial.println(F(" too long!"));
+      Serial.println(F("Packet too long!"));
   
     } else if (state == ERR_TX_TIMEOUT) {
       // timeout occured while transmitting packet
-      Serial.println(F(" timeout!"));
+      Serial.println(F("Timeout!"));
   
     } else if (state == ERR_SPI_WRITE_FAILED) {
       // Real value in SPI register does not match the expected one.
-      Serial.println(F(" SPI write failed!"));
+      Serial.println(F("SPI write failed!"));
   
     } else {
       // some other error occurred
-      Serial.print(F("failed, code "));
+      Serial.print(F("Failed, code "));
       Serial.println(state);
     }
 
 #ifdef DEBUG
-    Serial.println(F("enable interrupt"));
+    Serial.println(F("Enable interrupt"));
 #endif
     int newstate = lora.startReceive();
     if (newstate == ERR_NONE) {
